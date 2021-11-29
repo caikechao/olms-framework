@@ -1,0 +1,112 @@
+From 0f8d3b60dd9105ff12a4a48662e1dd4a0c00d469 Mon Sep 17 00:00:00 2001
+From: Kechao CAI <kccai@users.noreply.github.com>
+Date: Thu, 24 Jan 2019 10:57:06 +0800
+Subject: [PATCH] Add loss implementation
+
+---
+ include/uapi/linux/cmpts-helper.h |  5 +++++
+ include/uapi/linux/inet_diag.h    |  2 ++
+ net/ipv4/tcp_bbr.c                |  3 +++
+ net/mptcp/mptcp_cmpts.c           | 19 +++++++++++++++----
+ 4 files changed, 25 insertions(+), 4 deletions(-)
+
+diff --git a/include/uapi/linux/cmpts-helper.h b/include/uapi/linux/cmpts-helper.h
+index 872c516c9bf5..672c7e6ad1a2 100644
+--- a/include/uapi/linux/cmpts-helper.h
++++ b/include/uapi/linux/cmpts-helper.h
+@@ -20,8 +20,13 @@ struct cmpts_cmd_args {
+ 		unsigned long priv;
+ 		unsigned long len;
+ 		unsigned      threads_per_loader;
++	};
++	union {
+ 		unsigned long loss_vec_addr;
+ 	};
++	union {
++		unsigned long delivered_vec_addr;
++	};
+ };
+ 
+ enum CMPTS_CMD {
+diff --git a/include/uapi/linux/inet_diag.h b/include/uapi/linux/inet_diag.h
+index 14565d703291..6952022be040 100644
+--- a/include/uapi/linux/inet_diag.h
++++ b/include/uapi/linux/inet_diag.h
+@@ -189,6 +189,8 @@ struct tcp_bbr_info {
+ 	__u32	bbr_min_rtt;		/* min-filtered RTT in uSec */
+ 	__u32	bbr_pacing_gain;	/* pacing gain shifted left 8 bits */
+ 	__u32	bbr_cwnd_gain;		/* cwnd gain shifted left 8 bits */
++	__u32   bbr_last_loss;      /* LT last loss */
++	__u32   bbr_last_delivered; /* LT last delivered */
+ };
+ 
+ union tcp_cc_info {
+diff --git a/net/ipv4/tcp_bbr.c b/net/ipv4/tcp_bbr.c
+index 02ff2dde9609..a105f3fe505d 100644
+--- a/net/ipv4/tcp_bbr.c
++++ b/net/ipv4/tcp_bbr.c
+@@ -924,6 +924,9 @@ static size_t bbr_get_info(struct sock *sk, u32 ext, int *attr,
+ 		info->bbr.bbr_min_rtt		= bbr->min_rtt_us;
+ 		info->bbr.bbr_pacing_gain	= bbr->pacing_gain;
+ 		info->bbr.bbr_cwnd_gain		= bbr->cwnd_gain;
++        // kccai: patch for loss rate measure
++		info->bbr.bbr_last_loss = bbr->lt_last_lost;
++		info->bbr.bbr_last_delivered = bbr->lt_last_delivered;
+ 		*attr = INET_DIAG_BBRINFO;
+ 		return sizeof(info->bbr);
+ 	}
+diff --git a/net/mptcp/mptcp_cmpts.c b/net/mptcp/mptcp_cmpts.c
+index 7f20e7892e97..a94fedbcb88c 100644
+--- a/net/mptcp/mptcp_cmpts.c
++++ b/net/mptcp/mptcp_cmpts.c
+@@ -554,6 +554,9 @@ static int cmpts_get_rtt(void *data)
+ 	struct cmpts_cmd_args *args = data;
+ 	struct mptcp_tcp_sock *mptcp;
+ 	u32 *rtt_vec, *btlbw_vec;
++
++	u32 *loss_vec, *delivered_vec;
++
+ 	int err = 0;
+ 
+ 	if (!target_mpcb)
+@@ -567,6 +570,8 @@ static int cmpts_get_rtt(void *data)
+ 	rtt_vec = (u32 *)args->rtt_vec_addr;
+ 	btlbw_vec = (u32 *)args->btlbw_vec_addr;
+ 
++	loss_vec = (u32 *)args->loss_vec_addr;
++	delivered_vec = (u32 *)args->delivered_vec_addr;
+ 	/*
+ 	 * path_index is in reverse order because of linked-list insertion.
+ 	 * Also, path_index starts from 1.
+@@ -583,18 +588,24 @@ static int cmpts_get_rtt(void *data)
+ 		int attr;
+ 		int pi = tp->mptcp->path_index;
+ 
+-		ca = inet_csk(sk)->icsk_ca_ops;
++		ca                          = inet_csk(sk)->icsk_ca_ops;
+ 		if (ca->get_info) {
+ 			/* XXX Only BBR has the get_info() method */
+ 			ca->get_info(sk, (1 << (INET_DIAG_BBRINFO - 1)),
+ 				     &attr, &info);
+ 			if (attr == INET_DIAG_BBRINFO) {
+-				btlbw_vec[pi-1] = info.bbr.bbr_bw_lo;
++				btlbw_vec[pi-1]     = info.bbr.bbr_bw_lo;
++				loss_vec[pi-1]      = info.bbr.bbr_last_loss;
++				delivered_vec[pi-1] = info.bbr.bbr_last_delivered;
+ 			} else {
+-				btlbw_vec[pi-1] = 0;
++				btlbw_vec[pi-1]     = 0;
++				loss_vec[pi-1]      = 0;
++				delivered_vec[pi-1] = 0;
+ 			}
+ 		} else {
+-			btlbw_vec[pi-1] = 0;
++			btlbw_vec[pi-1]     = 0;
++			loss_vec[pi-1]      = 0;
++			delivered_vec[pi-1] = 0;
+ 		}
+ 
+ 		rtt_vec[pi-1] = tp->srtt_us;
+-- 
+2.20.1
+

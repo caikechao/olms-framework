@@ -1,0 +1,27 @@
+From 4d012a031efc958e088372106264f217e4725720 Mon Sep 17 00:00:00 2001
+From: Kechao CAI <kccai@users.noreply.github.com>
+Date: Thu, 24 Jan 2019 22:23:44 +0800
+Subject: [PATCH] Fix the loss/deliver count
+
+---
+ net/ipv4/tcp_bbr.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/net/ipv4/tcp_bbr.c b/net/ipv4/tcp_bbr.c
+index a105f3fe505d..c9e0bf82a38d 100644
+--- a/net/ipv4/tcp_bbr.c
++++ b/net/ipv4/tcp_bbr.c
+@@ -925,8 +925,8 @@ static size_t bbr_get_info(struct sock *sk, u32 ext, int *attr,
+ 		info->bbr.bbr_pacing_gain	= bbr->pacing_gain;
+ 		info->bbr.bbr_cwnd_gain		= bbr->cwnd_gain;
+         // kccai: patch for loss rate measure
+-		info->bbr.bbr_last_loss = bbr->lt_last_lost;
+-		info->bbr.bbr_last_delivered = bbr->lt_last_delivered;
++		info->bbr.bbr_last_loss = (tp->lost - bbr->lt_last_lost);
++		info->bbr.bbr_last_delivered = (tp->delivered - bbr->lt_last_delivered);
+ 		*attr = INET_DIAG_BBRINFO;
+ 		return sizeof(info->bbr);
+ 	}
+-- 
+2.20.1
+

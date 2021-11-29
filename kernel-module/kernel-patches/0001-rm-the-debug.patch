@@ -1,0 +1,31 @@
+From f20273ae3b531610121f9e596019915c2a4e7888 Mon Sep 17 00:00:00 2001
+From: Kechao CAI <kccai@users.noreply.github.com>
+Date: Sun, 27 Jan 2019 16:16:45 +0800
+Subject: [PATCH] rm the debug
+
+---
+ net/mptcp/mptcp_cmpts.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/net/mptcp/mptcp_cmpts.c b/net/mptcp/mptcp_cmpts.c
+index a94fedbcb88c..12caa6fd3017 100644
+--- a/net/mptcp/mptcp_cmpts.c
++++ b/net/mptcp/mptcp_cmpts.c
+@@ -610,12 +610,12 @@ static int cmpts_get_rtt(void *data)
+ 
+ 		rtt_vec[pi-1] = tp->srtt_us;
+ 
+-		if (1 /* DEBUG */) {
++		if (0 /* DEBUG */) {
+ 			pr_info("subflow[%d] lsndtime %u unavaialable %u\n",
+ 				pi, tp->lsndtime, mptcp->unavailable);
+ 		}
+ 
+-		if (1 /* DEBUG */) {
++		if (0 /* DEBUG */) {
+ 			pr_info("selection: %u backup %u\n",
+ 				target_mpcb->mptcp_num_selection,
+ 				target_mpcb->mptcp_num_backup);
+-- 
+2.20.1
+

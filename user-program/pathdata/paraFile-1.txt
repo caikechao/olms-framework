@@ -1,0 +1,8 @@
+# select 2 out of 4
+# when threshold= 0.7
+# selection vector is :1 0   0.8750 0.1250
+# r b l
+0.4 0.6 0.0
+0.5 0.4 0.0
+0.8 0.7 0.0
+0.6 0.5 0.0
